@@ -1,0 +1,11 @@
+/notebooks/checkpoints/
+/checkpoints/
+/notebooks/results/
+/results/
+*.npy
+*.pth
+
+# Jupyter NB Checkpoints
+.ipynb_checkpoints/
+
+__pycache__/
