@@ -5,6 +5,8 @@ from utils.tools import EarlyStopping, adjust_learning_rate
 from utils.metrics import metric
 from utils.Adam import Adam
 
+from tqdm.auto import tqdm
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -121,58 +123,64 @@ class Exp_Main(Exp_Basic):
         model_optim = self._select_optimizer()
         criterion = self._select_criterion()
 
-        for epoch in range(self.args.train_epochs):
-            iter_count = 0
-            train_loss = []
+        with tqdm(unit='epoch', total=self.args.train_epochs) as p:
+            for epoch in range(self.args.train_epochs):
+                iter_count = 0
+                train_loss = []
 
-            self.model.train()
-            epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
-                iter_count += 1
-                model_optim.zero_grad()
-                batch_x = batch_x.float().to(self.device)
+                self.model.train()
+                epoch_time = time.time()
+                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(tqdm(train_loader, leave=False, desc='train')):
+                    iter_count += 1
+                    model_optim.zero_grad()
+                    batch_x = batch_x.float().to(self.device)
 
-                batch_y = batch_y.float().to(self.device)
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
+                    batch_y = batch_y.float().to(self.device)
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
 
-                # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                    # decoder input
+                    dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                    dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
 
-                # encoder - decoder
-                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                    # encoder - decoder
+                    outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
-                f_dim = -1 if self.args.features == 'MS' else 0
-                batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
-                loss = criterion(outputs, batch_y)
-                train_loss.append(loss.item())
+                    f_dim = -1 if self.args.features == 'MS' else 0
+                    batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                    loss = criterion(outputs, batch_y)
+                    train_loss.append(loss.item())
 
-                if (i + 1) % 100 == 0:
-                    print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
-                    speed = (time.time() - time_now) / iter_count
-                    left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
-                    print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
-                    iter_count = 0
-                    time_now = time.time()
+                    # if (i + 1) % 10 == 0:
+                        # print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
+                        # speed = (time.time() - time_now) / iter_count
+                        # left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
+                        # print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
+                        # iter_count = 0
+                        # time_now = time.time()
+                        
+                        # p.desc = f'loss: {loss.item():.7f}'
+                    
 
-                loss.backward()
-                torch.nn.utils.clip_grad_norm(self.model.parameters(), 1.0)
-                model_optim.step()
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm(self.model.parameters(), 1.0)
+                    model_optim.step()
 
-            print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
-            train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
-            test_loss = self.vali(test_data, test_loader, criterion)
+                print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
+                train_loss = np.average(train_loss)
+                vali_loss = self.vali(vali_data, vali_loader, criterion)
+                test_loss = self.vali(test_data, test_loader, criterion)
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
-            early_stopping(vali_loss, self.model, path)
-            if early_stopping.early_stop:
-                print("Early stopping")
-                break
+                p.update()
+                p.desc = f'Train Loss: {test_loss:.7f} Vali Loss: {vali_loss:.7f}'
+                print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
+                    epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+                early_stopping(vali_loss, self.model, path)
+                if early_stopping.early_stop:
+                    print("Early stopping")
+                    break
 
-            adjust_learning_rate(model_optim, epoch + 1, self.args)
+                adjust_learning_rate(model_optim, epoch + 1, self.args)
 
         best_model_path = path + '/' + 'checkpoint.pth'
         self.model.load_state_dict(torch.load(best_model_path))
@@ -191,7 +199,7 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(tqdm(test_loader, leave=False)):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
@@ -237,4 +245,4 @@ class Exp_Main(Exp_Basic):
             np.save(folder_path + 'pred.npy', preds)
             np.save(folder_path + 'true.npy', trues)
 
-        return
+        return preds, trues

@@ -183,6 +183,10 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
 
     def forward(self, res, level, attn_mask=None):
+        
+        # when c_in!=c_out assume target columns are at end of channels
+        level = level[:, :, -self.c_out:]
+        
         season, season_attn = self._season_block(res)
         res = res - season[:, :-self.pred_len]
         growth, growth_attn = self._growth_block(res)

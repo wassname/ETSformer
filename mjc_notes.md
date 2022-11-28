@@ -2,6 +2,6 @@
 
 
 TODO:
-- [ ] run on stocks data
-- [ ] multivariate in, univariate out
-- [ ] graph
+- [x] run on stocks data
+- [x] multivariate in, univariate out
+- [x] graph

@@ -73,6 +73,7 @@ class ETSformer(nn.Module):
             if self.training:
                 x_enc = self.transform.transform(x_enc)
         res = self.enc_embedding(x_enc)
+        
         level, growths, seasons, season_attns, growth_attns = self.encoder(res, x_enc, attn_mask=enc_self_mask)
 
         growth, season, growth_dampings = self.decoder(growths, seasons)

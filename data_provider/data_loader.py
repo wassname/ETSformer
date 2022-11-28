@@ -229,6 +229,7 @@ class Dataset_Custom(Dataset):
         cols = list(df_raw.columns)
         cols.remove(self.target)
         cols.remove('date')
+        self.cols = ['date'] + cols + [self.target]
         df_raw = df_raw[['date'] + cols + [self.target]]
         # print(cols)
         num_train = int(len(df_raw) * 0.7)
@@ -244,6 +245,11 @@ class Dataset_Custom(Dataset):
             df_data = df_raw[cols_data]
         elif self.features == 'S':
             df_data = df_raw[[self.target]]
+        elif self.features == 'M2S':
+            df_data = df_raw[cols + [self.target]]
+            self.n_dims = 1 # len(cols + [self.target])
+        else:
+            raise NotImplementedError(self.features)
 
         if self.scale:
             train_data = df_data[border1s[0]:border2s[0]]
@@ -265,8 +271,15 @@ class Dataset_Custom(Dataset):
             data_stamp = data_stamp.transpose(1, 0)
 
         self.data_x = data[border1:border2]
-        self.data_y = data[border1:border2]
+        self.dates = df_raw['date'][border1:border2]
+        # self.data_y = data[border1:border2]
+        # y is just the col we predict
+        self.data_y = data[border1:border2][:, [-1]]
         self.data_stamp = data_stamp
+        
+        # TODO check this is right. For example check that it makes the df
+        o = self.seq_len - self.label_len # + self.label_len
+        self.index = self.dates.iloc[o:].iloc[:len(self)]
 
     def __getitem__(self, index):
         s_begin = index
