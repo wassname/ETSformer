@@ -163,6 +163,9 @@ class Exp_Main(Exp_Basic):
                 print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                     epoch + 1, train_steps, train_loss, vali_loss, test_loss))
                 early_stopping(vali_loss, self.model, path)
+                
+                
+                open(path + '/metrics.csv', 'a').write("{train_loss},{vali_loss},{test_loss}\n")
                 if early_stopping.early_stop:
                     print("Early stopping")
                     break
