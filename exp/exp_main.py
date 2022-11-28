@@ -129,7 +129,6 @@ class Exp_Main(Exp_Basic):
                 train_loss = []
 
                 self.model.train()
-                epoch_time = time.time()
                 for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(tqdm(train_loader, leave=False, desc='train')):
                     iter_count += 1
                     model_optim.zero_grad()
@@ -151,22 +150,10 @@ class Exp_Main(Exp_Basic):
                     loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
-                    # if (i + 1) % 10 == 0:
-                        # print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
-                        # speed = (time.time() - time_now) / iter_count
-                        # left_time = speed * ((self.args.train_epochs - epoch) * train_steps - i)
-                        # print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
-                        # iter_count = 0
-                        # time_now = time.time()
-                        
-                        # p.desc = f'loss: {loss.item():.7f}'
-                    
-
                     loss.backward()
                     torch.nn.utils.clip_grad_norm(self.model.parameters(), 1.0)
                     model_optim.step()
 
-                print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
                 train_loss = np.average(train_loss)
                 vali_loss = self.vali(vali_data, vali_loader, criterion)
                 test_loss = self.vali(test_data, test_loader, criterion)
